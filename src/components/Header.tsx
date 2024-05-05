@@ -1,8 +1,13 @@
+"use client";
 import Image from "next/image";
 import Link from "next/link";
 import React from "react";
+import { signIn, useSession, signOut } from "next-auth/react";
 
 export default function Header() {
+  const { data: session } = useSession();
+
+  console.log(session);
   return (
     <nav className="shadow-sm border border-b sticky top-0 bg-white z-30 p-3">
       <div className="flex justify-between items-center max-w-6xl mx-auto">
@@ -34,7 +39,23 @@ export default function Header() {
         />
         {/* menu items */}
 
-        <button className="text-sm font-semibold text-blue-500">Login</button>
+        {session ? (
+          <img
+            width={56}
+            height={56}
+            className="rounded-full cursor-pointer"
+            onClick={() => signOut()}
+            src={session.user?.image || ""}
+            alt={session.user?.name || ""}
+          />
+        ) : (
+          <button
+            onClick={() => signIn()}
+            className="text-sm font-semibold text-blue-500"
+          >
+            Login
+          </button>
+        )}
       </div>
     </nav>
   );
