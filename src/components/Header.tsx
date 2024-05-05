@@ -15,17 +15,26 @@ import {
   uploadBytesResumable,
 } from "firebase/storage";
 import { app } from "@/firebase";
-import { error } from "console";
+import {
+  addDoc,
+  collection,
+  getFirestore,
+  serverTimestamp,
+} from "firebase/firestore";
+import { timeStamp } from "console";
 
 export default function Header() {
   const { data: session } = useSession();
-
+  //   console.log(session);
   const [isOpen, setIsOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [imgUrl, setImgUrl] = useState<string | null>(null);
   const filePickerRef = useRef<HTMLInputElement | null>(null);
   const [imageFileUploading, setImageFileUploading] = useState(false);
+  const [postUploading, setPostUploading] = useState(false);
 
+  const [caption, setCaption] = useState("");
+  const db = getFirestore(app);
   function addImageToPost(e: ChangeEvent<HTMLInputElement>) {
     if (e.target.files) {
       const file = e.target.files[0];
@@ -68,11 +77,23 @@ export default function Header() {
           getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) => {
             setImgUrl(downloadURL);
             setImageFileUploading(false);
-            setSelectedFile(null);
           });
         }
       );
     }
+  };
+
+  const handleSubmit = async () => {
+    setPostUploading(true);
+    const docRef = addDoc(collection(db, "posts"), {
+      caption,
+      profileImage: session?.user?.image,
+      name: session?.user?.name,
+      image: imgUrl,
+      timeStamp: serverTimestamp(),
+    });
+    setPostUploading(false);
+    setIsOpen(false);
   };
   return (
     <nav className="shadow-sm border border-b sticky top-0 bg-white z-30 p-3">
@@ -156,9 +177,15 @@ export default function Header() {
               type="text"
               maxLength={150}
               placeholder="Please enter you caption here.."
+              value={caption}
+              onChange={(e) => setCaption(e.target.value)}
               className="m-4 border-none text-center  w-full focus:ring-0 py-4 outline-none"
             />
-            <button className="w-full bg-red-600 py-2 px-3 shadow-md rounded-md text-white hover:opacity-35 disabled:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-100">
+            <button
+              onClick={handleSubmit}
+              disabled={postUploading || !selectedFile || caption.trim() === ""}
+              className="w-full bg-red-600 py-2 px-3 shadow-md rounded-md text-white hover:opacity-35 disabled:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-100"
+            >
               Upload post
             </button>
             <AiOutlineClose
