@@ -1,40 +1,85 @@
 "use client";
 import Image from "next/image";
 import Link from "next/link";
-import React, { useState } from "react";
+import React, { ChangeEvent, useEffect, useRef, useState } from "react";
 import { signIn, useSession, signOut } from "next-auth/react";
 import Modal from "react-modal";
 import { MdAddCircle } from "react-icons/md";
 import { IoMdCamera } from "react-icons/io";
 import { AiOutlineClose } from "react-icons/ai";
+import Logo from "./Logo";
+import {
+  getDownloadURL,
+  getStorage,
+  ref,
+  uploadBytesResumable,
+} from "firebase/storage";
+import { app } from "@/firebase";
+import { error } from "console";
 
 export default function Header() {
   const { data: session } = useSession();
 
   const [isOpen, setIsOpen] = useState(false);
-  console.log(session);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [imgUrl, setImgUrl] = useState<string | null>(null);
+  const filePickerRef = useRef<HTMLInputElement | null>(null);
+  const [imageFileUploading, setImageFileUploading] = useState(false);
+
+  function addImageToPost(e: ChangeEvent<HTMLInputElement>) {
+    if (e.target.files) {
+      const file = e.target.files[0];
+      if (file) {
+        setSelectedFile(file);
+        setImgUrl(URL.createObjectURL(file));
+        console.log(URL.createObjectURL(file));
+      }
+    }
+  }
+
+  useEffect(() => {
+    if (selectedFile) {
+      uploadImageToStorage();
+    }
+  }, [selectedFile]);
+
+  const uploadImageToStorage = async () => {
+    setImageFileUploading(true);
+    const storage = getStorage(app);
+    const filename = new Date().getTime() + "-" + selectedFile?.name;
+    const storageRef = ref(storage, filename);
+    if (selectedFile) {
+      const uploadTask = uploadBytesResumable(storageRef, selectedFile);
+
+      uploadTask.on(
+        "state_changed",
+        (snapshot) => {
+          const progress =
+            (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+          console.log("Upload us " + progress + "% done");
+        },
+        (error) => {
+          console.log(error);
+          setSelectedFile(null);
+          setImageFileUploading(false);
+          setImgUrl(null);
+        },
+        () => {
+          getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) => {
+            setImgUrl(downloadURL);
+            setImageFileUploading(false);
+            setSelectedFile(null);
+          });
+        }
+      );
+    }
+  };
   return (
     <nav className="shadow-sm border border-b sticky top-0 bg-white z-30 p-3">
       <div className="flex justify-between items-center max-w-6xl mx-auto">
         {/* Logo */}
-        <Link href={"/"}>
-          <Image
-            src={"/instaLarge.png"}
-            alt="insta_logo"
-            width={100}
-            height={100}
-            className="hidden lg:inline-block"
-          />
-        </Link>
-        <Link href={"/"}>
-          <Image
-            src={"/instalogo.jpg"}
-            alt="insta_logo"
-            width={76}
-            height={76}
-            className="lg:hidden w-[50px] h-[50px]"
-          />
-        </Link>
+        <Logo />
+
         {/* Search input */}
 
         <input
@@ -82,7 +127,29 @@ export default function Header() {
               Add Post
             </h1>
             <div className="flex flex-col justify-center items-center h-[100%]">
-              <IoMdCamera className="text-6xl text-gray-400 cursor-pointer hover:scale-125 transition duration-500" />
+              {imgUrl ? (
+                <img
+                  src={imgUrl}
+                  alt="selected Image"
+                  className={`w-full h-[250px] object-cover cursor-pointer ${
+                    imageFileUploading ? "animate-pulse" : ""
+                  }`}
+                  onClick={() => setImgUrl(null)}
+                />
+              ) : (
+                <IoMdCamera
+                  className="text-6xl text-gray-400 cursor-pointer hover:scale-125 transition duration-500"
+                  onClick={() => filePickerRef.current?.click()}
+                />
+              )}
+
+              <input
+                type="file"
+                hidden
+                ref={filePickerRef}
+                accept="image/*"
+                onChange={addImageToPost}
+              />
               {/* <button onClick={() => setIsOpen(false)}>Close</button> */}
             </div>
             <input
